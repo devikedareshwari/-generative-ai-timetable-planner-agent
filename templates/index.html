@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartSched – AI Student Timetable Planner</title>
+  <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand">
+        <div class="brand-logo">S</div>
+        <div>
+          <span class="brand-name">SmartSched</span>
+          <span class="brand-badge">AI Agent</span>
+        </div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/" class="nav-link active">Home</a></li>
+        <li><a href="#formSection" class="nav-link">Create Timetable</a></li>
+        <li><a href="#" class="nav-link btn-open-saved">Saved Timetables</a></li>
+        <li><a href="#formSection" class="nav-link nav-cta">Get Started</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Ephemeral notice for Vercel if active -->
+    {% if is_ephemeral %}
+    <div class="alert alert-info">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <div>
+        <strong>Vercel Serverless Mode:</strong> Running with ephemeral SQLite storage. Saved timetables persist within the current instance.
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-tag">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        Powered by Google Gemini AI
+      </div>
+      <h1 class="hero-title">
+        SmartSched – <span class="gradient-text">AI Student Timetable Planner</span>
+      </h1>
+      <p class="hero-desc">
+        A genuine Generative AI academic agent that analyzes your subjects, exam dates, and daily study habits to build a realistic, balanced, and non-overlapping weekly study schedule.
+      </p>
+      <div class="hero-actions">
+        <a href="#formSection" class="btn btn-primary btn-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Create My Timetable
+        </a>
+        <a href="#" class="btn btn-secondary btn-lg btn-open-saved">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          View Saved Timetables
+        </a>
+      </div>
+    </section>
+
+    <!-- AI Agent Status Indicator -->
+    <div style="max-width: 860px; margin: 0 auto 1.5rem; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: {{ '#10b981' if ai_status else '#f59e0b' }};"></span>
+        <span>
+          <strong>AI Status:</strong>
+          {% if ai_status %}
+            <span style="color: var(--success); font-weight: 600;">Gemini Active</span> (Model: {{ model_name }})
+          {% else %}
+            <span style="color: var(--warning); font-weight: 600;">Demo Mode Active</span> (Deterministic Rule-Based Scheduler)
+          {% endif %}
+        </span>
+      </div>
+      <div>
+        {% if not ai_status %}
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Set GEMINI_API_KEY in .env to enable full AI</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Student Input Form Section -->
+    <section id="formSection" class="container-narrow" style="padding: 0;">
+      
+      <!-- Loading Box (Visible during generation) -->
+      <div id="loadingBox" class="loading-box">
+        <div class="spinner"></div>
+        <div class="loading-title">SmartSched AI is Crafting Your Timetable...</div>
+        <div id="loadingSteps" class="loading-steps">Analyzing your subjects and scheduling optimal study intervals...</div>
+      </div>
+
+      <div class="card" id="formCard">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Student Study Profile
+            </h2>
+            <p class="card-subtitle">Fill in your courses, target hours, and preferences. The AI will formulate your weekly plan.</p>
+          </div>
+        </div>
+
+        <form id="timetableForm">
+          <!-- 1. Student Name -->
+          <div class="form-group">
+            <label for="studentName" class="form-label">
+              1. Student Name <span class="required">*</span>
+            </label>
+            <input type="text" id="studentName" class="form-control" placeholder="e.g. Alex Johnson" required>
+          </div>
+
+          <!-- 2 & 4. Subjects and Difficulty Levels -->
+          <div class="form-group">
+            <label class="form-label">
+              2 &amp; 4. Subjects &amp; Difficulty Levels <span class="required">*</span>
+            </label>
+            <div class="form-hint">Add your academic subjects and set difficulty so the AI can allocate more focus to challenging topics.</div>
+            
+            <div class="subjects-manager">
+              <div id="subjectsContainer">
+                <!-- Rows dynamically added via JavaScript -->
+              </div>
+              <button type="button" id="btnAddSubject" class="btn btn-secondary btn-sm" style="margin-top: 0.75rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Another Subject
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Exam Dates (Optional) -->
+          <div class="form-group">
+            <label for="examDates" class="form-label">
+              3. Upcoming Exam Dates <span style="font-weight: normal; color: var(--text-muted);">(Optional)</span>
+            </label>
+            <input type="text" id="examDates" class="form-control" placeholder="e.g. Mathematics: Nov 25, Physics: Dec 02">
+            <div class="form-hint">Subjects with near exam dates will be prioritized in early slots and revision intervals.</div>
+          </div>
+
+          <!-- Timing Grid: 5, 6, 7, 8 -->
+          <div class="form-row">
+            <!-- 5. Available Study Hours -->
+            <div class="form-group">
+              <label for="studyHours" class="form-label">
+                5. Available Hours / Day <span class="required">*</span>
+              </label>
+              <input type="number" id="studyHours" class="form-control" min="1" max="14" step="0.5" value="4" required>
+              <div class="form-hint">Realistic daily self-study time.</div>
+            </div>
+
+            <!-- 8. Break Duration -->
+            <div class="form-group">
+              <label for="breakDuration" class="form-label">
+                8. Break Duration <span class="required">*</span>
+              </label>
+              <select id="breakDuration" class="form-control" required>
+                <option value="10">10 Minutes (Quick breather)</option>
+                <option value="15" selected>15 Minutes (Recommended)</option>
+                <option value="20">20 Minutes (Standard)</option>
+                <option value="30">30 Minutes (Deep rest)</option>
+              </select>
+              <div class="form-hint">Scheduled between study blocks.</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <!-- 6. Preferred Start Time -->
+            <div class="form-group">
+              <label for="startTime" class="form-label">
+                6. Preferred Start Time <span class="required">*</span>
+              </label>
+              <input type="time" id="startTime" class="form-control" value="09:00" required>
+              <div class="form-hint">Earliest study start time.</div>
+            </div>
+
+            <!-- 7. Preferred End Time -->
+            <div class="form-group">
+              <label for="endTime" class="form-label">
+                7. Preferred End Time <span class="required">*</span>
+              </label>
+              <input type="time" id="endTime" class="form-control" value="21:00" required>
+              <div class="form-hint">Latest time to wrap up.</div>
+            </div>
+          </div>
+
+          <!-- 9. Additional Instructions (Optional) -->
+          <div class="form-group">
+            <label for="instructions" class="form-label">
+              9. Additional Instructions <span style="font-weight: normal; color: var(--text-muted);">(Optional)</span>
+            </label>
+            <textarea id="instructions" class="form-control" rows="3" placeholder="e.g. Keep Saturday evening free; Focus heavily on Mathematics calculus exercises; Morning sessions preferred for hard subjects."></textarea>
+          </div>
+
+          <!-- Submit Button -->
+          <div style="margin-top: 2rem;">
+            <button type="submit" id="btnGenerate" class="btn btn-primary btn-lg btn-block">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              Generate AI Timetable
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Saved Timetables Modal -->
+  <div id="savedModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Saved Student Timetables</h3>
+        <button id="closeSavedModal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="savedListContainer">
+          <!-- Loaded via JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container" style="padding: 0;">
+      <p>SmartSched &copy; 2026 – Generative AI Student Timetable Planner Agent. Built with Flask, SQLite, and Google Gemini API.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/script.js"></script>
+</body>
+</html>

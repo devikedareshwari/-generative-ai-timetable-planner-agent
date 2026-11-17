@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartSched – Weekly Timetable</title>
+  <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand">
+        <div class="brand-logo">S</div>
+        <div>
+          <span class="brand-name">SmartSched</span>
+          <span class="brand-badge">AI Agent</span>
+        </div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/" class="nav-link">Home</a></li>
+        <li><a href="/" class="nav-link">Create New</a></li>
+        <li><a href="#" class="nav-link btn-open-saved">Saved Timetables</a></li>
+        <li><button id="btnPrint" class="btn btn-secondary btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print Timetable
+        </button></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Embed server timetable data if loaded by ID -->
+  {% if timetable %}
+  <script type="application/json" id="serverTimetableData">
+    {{ timetable | tojson }}
+  </script>
+  {% endif %}
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Alert if no timetable loaded -->
+    <div id="noTimetableAlert" class="alert alert-warning" style="display: none;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <div>
+        No timetable found in memory. Please <a href="/" style="font-weight: 600; text-decoration: underline;">create a timetable</a> or load one from saved history.
+      </div>
+    </div>
+
+    <!-- Header Card: Student Info & Badges -->
+    <div class="card" id="timetableContainer">
+      <div class="card-header">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <h1 class="card-title" style="font-size: 1.6rem;">
+              <span id="displayStudentName">Alex Johnson</span>'s Study Timetable
+            </h1>
+            <span id="generationBadge" class="badge badge-ai">AI Generated</span>
+          </div>
+          <p class="card-subtitle">Monday – Sunday Weekly Schedule with optimized study blocks and scheduled breaks.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <a href="/" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Edit Inputs
+          </a>
+          <button id="btnRegenerate" class="btn btn-outline-purple btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Regenerate
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotalHours">0 hrs</div>
+          <div class="stat-label">Total Planned Weekly Study</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statAvgDaily">0 hrs</div>
+          <div class="stat-label">Daily Average Study</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statSubjectsCount">0</div>
+          <div class="stat-label">Enrolled Subjects</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statBreakCount">0</div>
+          <div class="stat-label">Scheduled Rest Breaks</div>
+        </div>
+      </div>
+
+      <!-- AI Strategy & Suggestions Box -->
+      <div class="ai-summary-box">
+        <div class="ai-summary-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          AI Scheduling Strategy &amp; Prioritization Rationale
+        </div>
+        <div class="ai-summary-text" id="aiExplanationText">
+          Analyzing and optimizing student schedule...
+        </div>
+        <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-main);">
+          Key Suggestions for Academic Success:
+        </div>
+        <ul class="ai-suggestions-list" id="aiSuggestionsList">
+          <!-- Filled dynamically -->
+        </ul>
+      </div>
+
+      <!-- Day Filter Tabs -->
+      <div>
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-main);">
+          Filter by Day:
+        </div>
+        <div class="day-tabs" id="dayTabs">
+          <!-- Filter tabs generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Timetable Table -->
+      <div class="table-responsive">
+        <table class="timetable-table" id="timetableTable">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Day</th>
+              <th style="width: 14%;">Start Time</th>
+              <th style="width: 14%;">End Time</th>
+              <th style="width: 22%;">Subject</th>
+              <th style="width: 35%;">Activity / Focus Task</th>
+            </tr>
+          </thead>
+          <tbody id="timetableBody">
+            <!-- Populated via script.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action Bar Bottom -->
+      <div class="action-bar">
+        <div class="action-bar-left">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Timetable
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Timetable is automatically saved in your SQLite database.')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Status: Saved in DB
+          </button>
+        </div>
+        <div class="action-bar-right">
+          <a href="/" class="btn btn-primary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Another Timetable
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Ask SmartSched AI to Change Your Timetable -->
+    <section class="reschedule-section">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--secondary);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">
+          Ask SmartSched AI to Change Your Timetable
+        </h2>
+      </div>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Need adjustments? Type your instruction in natural language. The AI agent will adjust your weekly schedule while maintaining all session constraints.
+      </p>
+
+      <div id="rescheduleAlert" class="alert" style="display: none;"></div>
+
+      <form id="rescheduleForm">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <input type="text" id="rescheduleInput" class="form-control" style="flex: 1; min-width: 260px;" placeholder="e.g. Give more time to Mathematics; Move Physics to the evening; Add more breaks" required>
+          <button type="submit" id="btnReschedule" class="btn btn-primary" style="background-color: var(--secondary); border-color: var(--secondary);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Update Timetable
+          </button>
+        </div>
+      </form>
+
+      <!-- Quick Prompt Suggestion Chips -->
+      <div style="margin-top: 1rem;">
+        <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Quick Prompts:</div>
+        <div class="chips-container">
+          <span class="prompt-chip" data-prompt="Give more time to Mathematics on weekdays.">Give more time to Mathematics</span>
+          <span class="prompt-chip" data-prompt="Move Physics to the evening sessions after 17:00.">Move Physics to the evening</span>
+          <span class="prompt-chip" data-prompt="Add more 15-minute breaks between study blocks.">Add more breaks</span>
+          <span class="prompt-chip" data-prompt="Reduce daily study hours by 1 hour on weekends.">Reduce weekend study hours</span>
+          <span class="prompt-chip" data-prompt="Schedule extra revision slots for all subjects on Sunday.">Add Sunday revision slots</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Saved Timetables Modal -->
+  <div id="savedModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Saved Student Timetables</h3>
+        <button id="closeSavedModal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="savedListContainer">
+          <!-- Loaded via JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container" style="padding: 0;">
+      <p>SmartSched &copy; 2026 – Generative AI Student Timetable Planner Agent. Built with Flask, SQLite, and Google Gemini API.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/script.js"></script>
+</body>
+</html>

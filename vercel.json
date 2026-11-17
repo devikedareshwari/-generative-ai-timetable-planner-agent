@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/style.css",
+      "dest": "/public/style.css"
+    },
+    {
+      "src": "/script.js",
+      "dest": "/public/script.js"
+    },
+    {
+      "src": "/images/(.*)",
+      "dest": "/public/images/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/app.py"
+    }
+  ]
+}
