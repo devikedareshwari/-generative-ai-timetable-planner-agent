@@ -64,7 +64,14 @@ def serve_images(filename):
 
 # HTML Page Routes
 @app.route("/")
+@app.route("/api/index")
+@app.route("/app.py")
 def index():
+    # If routed through /api/index with an x-matched-path for timetable, render timetable view
+    matched = request.headers.get("x-matched-path") or request.headers.get("x-vercel-matched-path")
+    if matched and "/timetable" in matched:
+        return timetable_view()
+
     """Home page with hero section and student input form."""
     ai_status = agent.is_ai_available()
     model_name = agent.get_model_name()
