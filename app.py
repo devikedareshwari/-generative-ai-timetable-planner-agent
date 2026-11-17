@@ -32,6 +32,23 @@ app = Flask(
     template_folder=TEMPLATES_DIR
 )
 
+class VercelPathMiddleware:
+    """
+    WSGI middleware that restores original PATH_INFO from Vercel's x-matched-path
+    header when using serverless catch-all rewrites.
+    """
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        matched_path = environ.get("HTTP_X_MATCHED_PATH") or environ.get("HTTP_X_VERCEL_MATCHED_PATH")
+        if matched_path and not matched_path.startswith("/api/index"):
+            path_only = matched_path.split("?")[0]
+            environ["PATH_INFO"] = path_only
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+
 def get_static_content(filename):
     """Safely reads static file content for inline fallback rendering."""
     try:
@@ -62,16 +79,19 @@ def serve_images(filename):
     """Serves static image assets."""
     return send_from_directory(os.path.join(STATIC_DIR, "images"), filename)
 
+@app.route("/api/debug", methods=["GET", "POST"])
+@app.route("/debug", methods=["GET", "POST"])
+def debug_route():
+    return jsonify({
+        "path": request.path,
+        "method": request.method,
+        "environ_path_info": request.environ.get("PATH_INFO"),
+        "headers": dict(request.headers)
+    })
+
 # HTML Page Routes
 @app.route("/")
-@app.route("/api/index")
-@app.route("/app.py")
 def index():
-    # If routed through /api/index with an x-matched-path for timetable, render timetable view
-    matched = request.headers.get("x-matched-path") or request.headers.get("x-vercel-matched-path")
-    if matched and "/timetable" in matched:
-        return timetable_view()
-
     """Home page with hero section and student input form."""
     ai_status = agent.is_ai_available()
     model_name = agent.get_model_name()
