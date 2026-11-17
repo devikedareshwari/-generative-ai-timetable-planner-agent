@@ -4,12 +4,22 @@
  * day filtering, natural language rescheduling, and printing.
  */
 
-document.addEventListener("DOMContentLoaded", () => {
-  initSubjectManager();
-  initFormHandler();
-  initTimetablePage();
-  initSavedTimetablesModal();
-});
+(function () {
+  if (window.__smartsched_initialized) return;
+  window.__smartsched_initialized = true;
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+  } else {
+    initApp();
+  }
+
+  function initApp() {
+    initSubjectManager();
+    initFormHandler();
+    initTimetablePage();
+    initSavedTimetablesModal();
+  }
 
 /* ==========================================================================
    1. Dynamic Subject & Difficulty Manager (Index Form)
@@ -614,3 +624,4 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+})();

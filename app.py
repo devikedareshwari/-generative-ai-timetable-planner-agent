@@ -70,12 +70,14 @@ def index():
     model_name = agent.get_model_name()
     is_ephemeral = database.is_ephemeral_storage()
     css_content = get_static_content("style.css")
+    js_content = get_static_content("script.js")
     return render_template(
         "index.html",
         ai_status=ai_status,
         model_name=model_name,
         is_ephemeral=is_ephemeral,
-        css_content=css_content
+        css_content=css_content,
+        js_content=js_content
     )
 
 @app.route("/timetable")
@@ -93,6 +95,7 @@ def timetable_view():
     model_name = agent.get_model_name()
     is_ephemeral = database.is_ephemeral_storage()
     css_content = get_static_content("style.css")
+    js_content = get_static_content("script.js")
 
     return render_template(
         "timetable.html",
@@ -101,7 +104,8 @@ def timetable_view():
         ai_status=ai_status,
         model_name=model_name,
         is_ephemeral=is_ephemeral,
-        css_content=css_content
+        css_content=css_content,
+        js_content=js_content
     )
 
 @app.route("/timetable/<int:timetable_id>")

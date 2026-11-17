@@ -238,5 +238,10 @@
 
   <!-- Scripts -->
   <script src="/script.js"></script>
+  {% if js_content %}
+  <script>
+{{ js_content | safe }}
+  </script>
+  {% endif %}
 </body>
 </html>
