@@ -19,13 +19,29 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("SmartSched.App")
 
-# Initialize Flask with public/ as static_folder
+# Base directories
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "public")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
+# Initialize Flask with absolute public/ as static_folder
 app = Flask(
     __name__,
-    static_folder="public",
+    static_folder=STATIC_DIR,
     static_url_path="",
-    template_folder="templates"
+    template_folder=TEMPLATES_DIR
 )
+
+def get_static_content(filename):
+    """Safely reads static file content for inline fallback rendering."""
+    try:
+        filepath = os.path.join(STATIC_DIR, filename)
+        if os.path.isfile(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                return f.read()
+    except Exception as e:
+        logger.error(f"Error reading static file {filename}: {e}")
+    return ""
 
 # Ensure database tables exist on startup
 database.init_db()
@@ -34,17 +50,17 @@ database.init_db()
 @app.route("/style.css")
 def serve_css():
     """Serves the main CSS file with correct MIME type."""
-    return send_from_directory(app.static_folder, "style.css", mimetype="text/css")
+    return send_from_directory(STATIC_DIR, "style.css", mimetype="text/css")
 
 @app.route("/script.js")
 def serve_js():
     """Serves the main JavaScript file with correct MIME type."""
-    return send_from_directory(app.static_folder, "script.js", mimetype="application/javascript")
+    return send_from_directory(STATIC_DIR, "script.js", mimetype="application/javascript")
 
 @app.route("/images/<path:filename>")
 def serve_images(filename):
     """Serves static image assets."""
-    return send_from_directory(os.path.join(app.static_folder, "images"), filename)
+    return send_from_directory(os.path.join(STATIC_DIR, "images"), filename)
 
 # HTML Page Routes
 @app.route("/")
@@ -53,11 +69,13 @@ def index():
     ai_status = agent.is_ai_available()
     model_name = agent.get_model_name()
     is_ephemeral = database.is_ephemeral_storage()
+    css_content = get_static_content("style.css")
     return render_template(
         "index.html",
         ai_status=ai_status,
         model_name=model_name,
-        is_ephemeral=is_ephemeral
+        is_ephemeral=is_ephemeral,
+        css_content=css_content
     )
 
 @app.route("/timetable")
@@ -74,6 +92,7 @@ def timetable_view():
     ai_status = agent.is_ai_available()
     model_name = agent.get_model_name()
     is_ephemeral = database.is_ephemeral_storage()
+    css_content = get_static_content("style.css")
 
     return render_template(
         "timetable.html",
@@ -81,7 +100,8 @@ def timetable_view():
         timetable_id=timetable_id,
         ai_status=ai_status,
         model_name=model_name,
-        is_ephemeral=is_ephemeral
+        is_ephemeral=is_ephemeral,
+        css_content=css_content
     )
 
 @app.route("/timetable/<int:timetable_id>")
