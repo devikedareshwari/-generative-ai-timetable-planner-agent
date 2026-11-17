@@ -107,6 +107,28 @@ def index():
         js_content=js_content
     )
 
+@app.route("/api/index", methods=["GET", "POST"])
+def vercel_entry():
+    # If the user requested /timetable or /api/... inspect headers
+    matched = (
+        request.headers.get("x-matched-path")
+        or request.headers.get("x-vercel-matched-path")
+        or request.headers.get("x-rewrite-url")
+        or request.environ.get("REQUEST_URI")
+        or ""
+    )
+    if "/timetable" in matched:
+        return timetable_view()
+    if "/api/generate" in matched:
+        return api_generate()
+    if "/api/reschedule" in matched:
+        return api_reschedule()
+    if "/api/status" in matched:
+        return api_status()
+    if "/api/timetables" in matched:
+        return api_get_timetables()
+    return index()
+
 @app.route("/timetable")
 def timetable_view():
     """Timetable display page."""
