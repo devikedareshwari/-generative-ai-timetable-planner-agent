@@ -34,20 +34,60 @@ app = Flask(
 
 class VercelPathMiddleware:
     """
-    WSGI middleware that restores original PATH_INFO from Vercel's x-matched-path
-    header when using serverless catch-all rewrites.
+    WSGI middleware that restores original PATH_INFO from query parameter __path__
+    or headers when using serverless catch-all rewrites on Vercel.
     """
     def __init__(self, wsgi_app):
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        matched_path = environ.get("HTTP_X_MATCHED_PATH") or environ.get("HTTP_X_VERCEL_MATCHED_PATH")
-        if matched_path and not matched_path.startswith("/api/index"):
-            path_only = matched_path.split("?")[0]
-            environ["PATH_INFO"] = path_only
+        import urllib.parse
+
+        query_string = environ.get("QUERY_STRING", "")
+        path_override = None
+
+        # 1. Check query parameter __path__ from vercel.json rewrite
+        if "__path__=" in query_string:
+            try:
+                parsed = urllib.parse.parse_qs(query_string, keep_blank_values=True)
+                if "__path__" in parsed and parsed["__path__"]:
+                    raw_path = parsed["__path__"][0]
+                    # Clean up query string by removing __path__
+                    cleaned_params = {k: v for k, v in parsed.items() if k != "__path__"}
+                    environ["QUERY_STRING"] = urllib.parse.urlencode(cleaned_params, doseq=True)
+                    path_override = raw_path
+            except Exception as e:
+                logger.warning(f"Error parsing __path__ from query string: {e}")
+
+        # 2. Check headers if __path__ was not found
+        if not path_override:
+            for header_key in [
+                "HTTP_X_MATCHED_PATH",
+                "HTTP_X_VERCEL_MATCHED_PATH",
+                "HTTP_X_REWRITE_URL",
+                "HTTP_X_FORWARDED_URI",
+            ]:
+                val = environ.get(header_key)
+                if val and not val.startswith("/api/index"):
+                    path_override = val.split("?")[0]
+                    break
+
+        if path_override:
+            if not path_override.startswith("/"):
+                path_override = "/" + path_override
+            environ["PATH_INFO"] = path_override
+
         return self.wsgi_app(environ, start_response)
 
 app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+
+@app.after_request
+def add_cors_headers(response):
+    """Ensure CORS headers are set for cross-origin or local debugging requests."""
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+    return response
 
 def get_static_content(filename):
     """Safely reads static file content for inline fallback rendering."""
@@ -107,26 +147,58 @@ def index():
         js_content=js_content
     )
 
-@app.route("/api/index", methods=["GET", "POST"])
+@app.route("/api/index", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
 def vercel_entry():
-    # If the user requested /timetable or /api/... inspect headers
-    matched = (
-        request.headers.get("x-matched-path")
+    """
+    Fallback entry point for Vercel serverless catch-all rewrites.
+    Dispatches directly to specific handlers if PATH_INFO was not rewritten.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+
+    path = (
+        request.args.get("__path__")
+        or request.headers.get("x-matched-path")
         or request.headers.get("x-vercel-matched-path")
         or request.headers.get("x-rewrite-url")
+        or request.headers.get("x-forwarded-uri")
         or request.environ.get("REQUEST_URI")
+        or request.environ.get("RAW_URI")
         or ""
     )
-    if "/timetable" in matched:
-        return timetable_view()
-    if "/api/generate" in matched:
+    if not path.startswith("/"):
+        path = "/" + path
+
+    clean_path = path.split("?")[0]
+    logger.info(f"vercel_entry handling clean_path: '{clean_path}' (method: {request.method})")
+
+    if clean_path.startswith("/api/generate"):
         return api_generate()
-    if "/api/reschedule" in matched:
+    if clean_path.startswith("/api/reschedule"):
         return api_reschedule()
-    if "/api/status" in matched:
+    if clean_path.startswith("/api/status"):
         return api_status()
-    if "/api/timetables" in matched:
+    if clean_path.startswith("/api/timetables"):
+        parts = [p for p in clean_path.split("/") if p]
+        if len(parts) >= 3:
+            try:
+                t_id = int(parts[2])
+                if request.method == "DELETE":
+                    return api_delete_timetable(t_id)
+                return api_get_timetable(t_id)
+            except ValueError:
+                pass
         return api_get_timetables()
+    if clean_path.startswith("/timetable"):
+        return timetable_view()
+    if clean_path.startswith("/style.css"):
+        return serve_css()
+    if clean_path.startswith("/script.js"):
+        return serve_js()
+    if clean_path.startswith("/images/"):
+        filename = clean_path.replace("/images/", "", 1)
+        return serve_images(filename)
+
     return index()
 
 @app.route("/timetable")
@@ -163,12 +235,14 @@ def timetable_detail(timetable_id):
     return redirect(url_for("timetable_view", id=timetable_id))
 
 # API Endpoints
-@app.route("/api/generate", methods=["POST"])
+@app.route("/api/generate", methods=["POST", "OPTIONS"])
 def api_generate():
     """
     Generate a personalized weekly timetable using Generative AI or fallback.
     Expects JSON student input.
     """
+    if request.method == "OPTIONS":
+        return "", 204
     try:
         data = request.get_json(force=True)
     except Exception:
@@ -266,11 +340,13 @@ def api_generate():
         "student_data": student_data
     })
 
-@app.route("/api/reschedule", methods=["POST"])
+@app.route("/api/reschedule", methods=["POST", "OPTIONS"])
 def api_reschedule():
     """
     Natural Language rescheduling: adjusts an existing schedule based on student text prompt.
     """
+    if request.method == "OPTIONS":
+        return "", 204
     try:
         data = request.get_json(force=True)
     except Exception:
@@ -312,9 +388,11 @@ def api_reschedule():
 
     return jsonify(result)
 
-@app.route("/api/timetables", methods=["GET"])
+@app.route("/api/timetables", methods=["GET", "OPTIONS"])
 def api_get_timetables():
     """Returns recent saved timetables."""
+    if request.method == "OPTIONS":
+        return "", 204
     limit = request.args.get("limit", 15, type=int)
     timetables = database.get_recent_timetables(limit=limit)
     return jsonify({
@@ -323,23 +401,29 @@ def api_get_timetables():
         "is_ephemeral": database.is_ephemeral_storage()
     })
 
-@app.route("/api/timetables/<int:timetable_id>", methods=["GET"])
+@app.route("/api/timetables/<int:timetable_id>", methods=["GET", "OPTIONS"])
 def api_get_timetable(timetable_id):
     """Returns details of a specific saved timetable."""
+    if request.method == "OPTIONS":
+        return "", 204
     record = database.get_timetable_by_id(timetable_id)
     if not record:
         return jsonify({"status": "error", "message": "Timetable not found."}), 404
     return jsonify({"status": "success", "timetable": record})
 
-@app.route("/api/timetables/<int:timetable_id>", methods=["DELETE"])
+@app.route("/api/timetables/<int:timetable_id>", methods=["DELETE", "OPTIONS"])
 def api_delete_timetable(timetable_id):
     """Deletes a saved timetable."""
+    if request.method == "OPTIONS":
+        return "", 204
     success = database.delete_timetable(timetable_id)
     return jsonify({"status": "success" if success else "not_found"})
 
-@app.route("/api/status", methods=["GET"])
+@app.route("/api/status", methods=["GET", "OPTIONS"])
 def api_status():
     """Returns application status, AI configuration, and storage info."""
+    if request.method == "OPTIONS":
+        return "", 204
     return jsonify({
         "status": "healthy",
         "ai_configured": agent.is_ai_available(),

@@ -21,6 +21,23 @@
     initSavedTimetablesModal();
   }
 
+  async function safeFetchJson(url, options = {}) {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error("Non-JSON response from " + url + ":", text);
+      throw new Error(
+        response.ok
+          ? "Server returned an unexpected response format. Please refresh and try again."
+          : `Server returned error (${response.status} ${response.statusText || ""}). Please try again later.`
+      );
+    }
+    return { ok: response.ok, status: response.status, data };
+  }
+
 /* ==========================================================================
    1. Dynamic Subject & Difficulty Manager (Index Form)
    ========================================================================== */
@@ -144,15 +161,15 @@ function initFormHandler() {
     setLoadingState(true);
 
     try {
-      const response = await fetch("/api/generate", {
+      const res = await safeFetchJson("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
-      const result = await response.json();
+      const result = res.data;
 
-      if (!response.ok || result.status !== "success") {
+      if (!res.ok || result.status !== "success") {
         throw new Error(result.message || "Failed to generate timetable.");
       }
 
@@ -442,7 +459,7 @@ function initRescheduling() {
     if (alertBox) alertBox.style.display = "none";
 
     try {
-      const response = await fetch("/api/reschedule", {
+      const res = await safeFetchJson("/api/reschedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -453,9 +470,9 @@ function initRescheduling() {
         })
       });
 
-      const result = await response.json();
+      const result = res.data;
 
-      if (!response.ok || result.status === "error") {
+      if (!res.ok || result.status === "error") {
         throw new Error(result.message || "Failed to update timetable.");
       }
 
@@ -506,14 +523,14 @@ async function regenerateTimetable() {
   }
 
   try {
-    const response = await fetch("/api/generate", {
+    const res = await safeFetchJson("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(currentTimetableState.student_data)
     });
 
-    const result = await response.json();
-    if (!response.ok || result.status !== "success") {
+    const result = res.data;
+    if (!res.ok || result.status !== "success") {
       throw new Error(result.message || "Failed to regenerate.");
     }
 
@@ -567,10 +584,10 @@ async function loadSavedTimetables(container) {
   container.innerHTML = `<div style="text-align:center; padding: 2rem; color: var(--text-muted);">Loading saved timetables...</div>`;
 
   try {
-    const response = await fetch("/api/timetables");
-    const data = await response.json();
+    const res = await safeFetchJson("/api/timetables");
+    const data = res.data;
 
-    if (!response.ok || data.status !== "success") {
+    if (!res.ok || data.status !== "success") {
       throw new Error(data.message || "Could not fetch saved timetables.");
     }
 

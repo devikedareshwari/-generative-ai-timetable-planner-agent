@@ -194,5 +194,48 @@ class SmartSchedTestCase(unittest.TestCase):
         not_found_resp = self.client.get(f"/api/timetables/{timetable_id}")
         self.assertEqual(not_found_resp.status_code, 404)
 
+    def test_13_vercel_path_rewrite_handling(self):
+        """Verify that Vercel rewrites using __path__ parameter dispatch correctly."""
+        # 1. Status via Vercel rewrite
+        resp_status = self.client.get("/api/index?__path__=/api/status")
+        self.assertEqual(resp_status.status_code, 200)
+        self.assertEqual(resp_status.get_json()["status"], "healthy")
+
+        # 2. Generate via Vercel rewrite
+        payload = {
+            "name": "Jordan Lee",
+            "subjects": ["Biology"],
+            "available_hours": 3.0,
+            "preferred_start": "09:00",
+            "preferred_end": "18:00"
+        }
+        resp_gen = self.client.post("/api/index?__path__=/api/generate", json=payload)
+        self.assertEqual(resp_gen.status_code, 200)
+        gen_data = resp_gen.get_json()
+        self.assertEqual(gen_data["status"], "success")
+        self.assertTrue(len(gen_data["schedule"]) > 0)
+
+        # 3. Timetable view via Vercel rewrite
+        resp_tt = self.client.get("/api/index?__path__=/timetable")
+        self.assertEqual(resp_tt.status_code, 200)
+        self.assertIn(b"SmartSched", resp_tt.data)
+
+        # 4. Static CSS via Vercel rewrite
+        resp_css = self.client.get("/api/index?__path__=/style.css")
+        self.assertEqual(resp_css.status_code, 200)
+        self.assertIn("text/css", resp_css.content_type)
+
+        # 5. Static JS via Vercel rewrite
+        resp_js = self.client.get("/api/index?__path__=/script.js")
+        self.assertEqual(resp_js.status_code, 200)
+        self.assertIn("javascript", resp_js.content_type)
+
+    def test_14_cors_and_options_support(self):
+        """Verify CORS headers and OPTIONS preflight response."""
+        resp = self.client.open("/api/generate", method="OPTIONS")
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "*")
+        self.assertIn("POST", resp.headers.get("Access-Control-Allow-Methods", ""))
+
 if __name__ == "__main__":
     unittest.main()
